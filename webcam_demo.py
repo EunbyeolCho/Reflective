@@ -7,6 +7,7 @@ import math
 from dtaidistance import dtw
 from posenet import *
 from sklearn import preprocessing
+from sklearn.metrics.pairwise import cosine_similarity
 
 from posenet.utils import read_cap
 
@@ -81,6 +82,7 @@ def keypoint_compare(img_key, our_key, xmin, ymin, xmin_img, ymin_img):
     for i in range(17):
         print(img_key[i]-[xmin_img, ymin_img], our_key[i]-[xmin,ymin])
         s = cosine_similarity(img_key[i]-[xmin_img, ymin_img], our_key[i]-[xmin,ymin])
+
         sum += s
     sum = sum/17
     return sum
@@ -89,12 +91,13 @@ def keypoint_compare_sklearn(img_key, our_key):
     sum = 0
     for i in range(17):
         print(img_key[i], our_key[i])
+        # s = cosine_similarity(img_key[i], our_key[i])
         s = cosine_similarity(img_key[i], our_key[i])
         sum += s
     sum = sum/17
     return sum
 
-def normalize(img_key, our_key):
+def normalize_sklearn(img_key, our_key):
     img_normalize_vec = []
     our_normalize_vec = []
     for i in range(0,17):
@@ -105,9 +108,9 @@ def normalize(img_key, our_key):
     X = np.asarray([img_normalize_vec, our_normalize_vec], dtype=np.float)
     X_normalized = preprocessing.normalize(X, norm='l2')
 
-    X_normalized_x = X_normalized[0,:].reshape(17,2, order='C')
-    X_normalized_y = X_normalized[1,:].reshape(17,2, order='C')
-    return X_normalized_x, X_normalized_y
+    X_normalized_img = X_normalized[0,:].reshape(17,2, order='C')
+    X_normalized_our = X_normalized[1,:].reshape(17,2, order='C')
+    return X_normalized_img, X_normalized_our
 
 def eudist(cosine):
     dist = 2*(1- cosine)
@@ -182,15 +185,15 @@ def main():
             xmin_img = coord_img[:, 0].min()
             ymin_img = coord_img[:, 1].min()
             # print(img_key_coord[0,:,:])
-            x_norm, y_norm = normalize(img_key_coord[0,:,:], keypoint_coords[0,:,:])
+            norm_img, norm_our = normalize_sklearn(img_key_coord[0,:,:], keypoint_coords[0,:,:])
             # cossim = keypoint_compare(img_key_coord[0,:,:], keypoint_coords[0,:,:], xmin, ymin,xmin_img, ymin_img)
-            cossim = keypoint_compare_sklearn(x_norm, y_norm)
-            # dist = eudist(cossim)
+            cossim = keypoint_compare_sklearn(norm_img, norm_our)
+            dist = eudist(cossim)
             overlay_image = posenet.draw_skel_and_kp(
                 display_image, pose_scores, keypoint_scores, keypoint_coords,
                 min_pose_score=0.15, min_part_score=0.1)
 
-            cv2.putText(overlay_image, str(cossim   ), (50,50),cv2.FONT_HERSHEY_SIMPLEX, 3, (255,255,255),1)
+            cv2.putText(overlay_image, str(dist), (50,50),cv2.FONT_HERSHEY_SIMPLEX, 3, (255,255,255),1)
             cv2.imshow('posenet', overlay_image)
 
             frame_count += 1

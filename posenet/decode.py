@@ -65,5 +65,8 @@ def decode_pose(
                 scores, offsets, output_stride, displacements_fwd)
             instance_keypoint_scores[target_keypoint_id] = score
             instance_keypoint_coords[target_keypoint_id] = coords
-
+    # for edge in range(num_edges):
+    #     source_keypoint_id, target_keypoint_id = PARENT_CHILD_TUPLES[edge]
+    #     if instance_keypoint_scores[target_keypoint_id] < 0.1:
+    #         instance_keypoint_coords[target_keypoint_id] = np.zeros((1,2))
     return instance_keypoint_scores, instance_keypoint_coords

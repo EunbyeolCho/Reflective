@@ -121,7 +121,6 @@ def decode_multiple_poses(
     offsets = offsets.reshape(height, width, 2, -1).swapaxes(2, 3)
     displacements_fwd = displacements_fwd.reshape(height, width, 2, -1).swapaxes(2, 3)
     displacements_bwd = displacements_bwd.reshape(height, width, 2, -1).swapaxes(2, 3)
-
     for root_score, root_id, root_coord in scored_parts:
         root_image_coords = root_coord * output_stride + offsets[
             root_coord[0], root_coord[1], root_id]

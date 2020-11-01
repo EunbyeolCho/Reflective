@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--model', type=int, default=101)
 parser.add_argument('--scale_factor', type=float, default=1.0)
 parser.add_argument('--notxt', action='store_true')
-parser.add_argument('--image_dir', type=str, default='./images')
+parser.add_argument('--image_dir', type=str, default=r'./images')
 parser.add_argument('--output_dir', type=str, default='./output')
 args = parser.parse_args()
 
@@ -46,14 +46,14 @@ def main():
                 displacement_bwd_result.squeeze(axis=0),
                 output_stride=output_stride,
                 max_pose_detections=10,
-                min_pose_score=0.25)
+                min_pose_score=0.001)
 
             keypoint_coords *= output_scale
 
             if args.output_dir:
                 draw_image = posenet.draw_skel_and_kp(
                     draw_image, pose_scores, keypoint_scores, keypoint_coords,
-                    min_pose_score=0.25, min_part_score=0.25)
+                    min_pose_score=0.25, min_part_score=0.001)
 
                 cv2.imwrite(os.path.join(args.output_dir, os.path.relpath(f, args.image_dir)), draw_image)
 

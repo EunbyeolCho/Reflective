@@ -32,7 +32,7 @@ def imgkey():
         start = time.time()
         input_image, draw_image, output_scale = posenet.read_imgfile(
             f, scale_factor=args.scale_factor, output_stride=output_stride)
-        print("original img",input_image.shape)
+        # print("original img",input_image.shape)
         heatmaps_result, offsets_result, displacement_fwd_result, displacement_bwd_result = sess.run(
             model_outputs,
             feed_dict={'image:0': input_image}
@@ -45,9 +45,9 @@ def imgkey():
             displacement_bwd_result.squeeze(axis=0),
             output_stride=output_stride,
             max_pose_detections=10,
-            min_pose_score=0.25)
+            min_pose_score=0.001)
 
-        # keypoint_coords *= output_scale
+        keypoint_coords *= output_scale
         for pi in range(len(pose_scores)):
             if pose_scores[pi] == 0.:
                 break
@@ -59,7 +59,11 @@ def imgkey():
                 sum = sum + s
             pos_temp_data.append(sum)
 
+        draw_image = posenet.draw_skel_and_kp(
+            draw_image, pose_scores, keypoint_scores, keypoint_coords,
+            min_pose_score=0.25, min_part_score=0.001)
 
+        cv2.imshow("image key!",draw_image)
     return pos_temp_data, keypoint_coords
 
 def compare(self, ip, model, i, j):
@@ -72,8 +76,7 @@ def compare(self, ip, model, i, j):
 def check_sim(correct_key, our_key):
     return dtw.distance(correct_key, our_key)
 
-def cosine_similarity(a, b):
-
+def cosine_similarity_our(a, b):
     #return np.inner(a, b) / (np.linalg.norm(a) * (np.linalg.norm(b)))
     return np.dot(a, b) / (np.linalg.norm(a) * (np.linalg.norm(b)))
 
@@ -82,7 +85,6 @@ def keypoint_compare(img_key, our_key, xmin, ymin, xmin_img, ymin_img):
     for i in range(17):
         print(img_key[i]-[xmin_img, ymin_img], our_key[i]-[xmin,ymin])
         s = cosine_similarity(img_key[i]-[xmin_img, ymin_img], our_key[i]-[xmin,ymin])
-
         sum += s
     sum = sum/17
     return sum
@@ -90,9 +92,12 @@ def keypoint_compare(img_key, our_key, xmin, ymin, xmin_img, ymin_img):
 def keypoint_compare_sklearn(img_key, our_key):
     sum = 0
     for i in range(17):
-        print(img_key[i], our_key[i])
+        # print(img_key[i], our_key[i])
+        if img_key[i][0] == 0:
+            z = np.zeros((400,400), dtype=np.uint8)
         # s = cosine_similarity(img_key[i], our_key[i])
-        s = cosine_similarity(img_key[i], our_key[i])
+        s = abs(cosine_similarity(img_key[i].reshape(1,-1), our_key[i].reshape(1,-1)))
+        s = abs(eudist(s))
         sum += s
     sum = sum/17
     return sum
@@ -100,6 +105,11 @@ def keypoint_compare_sklearn(img_key, our_key):
 def normalize_sklearn(img_key, our_key):
     img_normalize_vec = []
     our_normalize_vec = []
+    # print(our_key)
+    # zero_our = np.where(our_key ==0)
+    # print(zero_our)
+    findzero = []
+
     for i in range(0,17):
         img_normalize_vec.append(img_key[i][0])
         img_normalize_vec.append(img_key[i][1])
@@ -119,12 +129,18 @@ def eudist(cosine):
 
 def main():
     img_key, img_key_coord = imgkey()
+    ankle_height = 0
+    counting = 0
+    old_raiseup = False
+    okay = False
+    raiseup = False
+    print(os.path.isfile('D:\posenet-python-master\images\KakaoTalk_20201101_151405907.mp4'))
     with tf.Session() as sess:
         model_cfg, model_outputs = posenet.load_model(args.model, sess)
         output_stride = model_cfg['output_stride']
 
         if args.file is not None:
-            cap = cv2.VideoCapture(args.file)
+            cap = cv2.VideoCapture(r"D:\posenet-python-master\images\KakaoTalk_20201101_151405907.mp4")
         else:
             cap = cv2.VideoCapture(args.cam_id)
         cap.set(3, args.cam_width)
@@ -156,9 +172,9 @@ def main():
                 displacement_bwd_result.squeeze(axis=0),
                 output_stride=output_stride,
                 max_pose_detections=10,
-                min_pose_score=0.15)
+                min_pose_score=0.001)
 
-            # keypoint_coords *= output_scale
+            keypoint_coords *= output_scale
 
             # TODO this isn't particularly fast, use GL for drawing and display someday...
             for pi in range(len(pose_scores)):
@@ -174,7 +190,7 @@ def main():
             # print(keypoint_coords[0,:,:], "\n\n")
             sim = str(check_sim(pos_temp_data, img_key))
 
-            print("****")
+            # print("****")
             # print(keypoint_coords[0,:,:])
             coord = keypoint_coords[0,:,:]
 
@@ -185,15 +201,40 @@ def main():
             xmin_img = coord_img[:, 0].min()
             ymin_img = coord_img[:, 1].min()
             # print(img_key_coord[0,:,:])
+            # print(keypoint_coords[0,:,:][4][1], keypoint_coords[0,:,:][2][1])
+            print(keypoint_coords[0,:,:])
             norm_img, norm_our = normalize_sklearn(img_key_coord[0,:,:], keypoint_coords[0,:,:])
+
+            if keypoint_coords[0,:,:][10][0] > keypoint_coords[0,:,:][12][0] + 20:
+                ready = "True"
+            else:
+                ready = "ing"
+                shoulder_min = keypoint_coords[0, :, :][6][0] - 15
+                shoulder_max = keypoint_coords[0, :, :][6][0] + 15
+
+                if shoulder_min < keypoint_coords[0,:,:][10][0] < shoulder_max:
+                    raiseup = True
+            hip_min = keypoint_coords[0, :, :][12][0] - 15
+            hip_max = keypoint_coords[0, :, :][12][0] + 15
+            if raiseup == True and hip_min<keypoint_coords[0, :, :][10][0]<hip_max:
+                counting +=1
+                raiseup = False
+
+            old_raiseup = raiseup
             # cossim = keypoint_compare(img_key_coord[0,:,:], keypoint_coords[0,:,:], xmin, ymin,xmin_img, ymin_img)
             cossim = keypoint_compare_sklearn(norm_img, norm_our)
             dist = eudist(cossim)
+
+            if cossim < 0.08:
+                say ="True"
+            else:
+                say = "False"
             overlay_image = posenet.draw_skel_and_kp(
                 display_image, pose_scores, keypoint_scores, keypoint_coords,
-                min_pose_score=0.15, min_part_score=0.1)
+                min_pose_score=0.1, min_part_score=0.1)
 
-            cv2.putText(overlay_image, str(dist), (50,50),cv2.FONT_HERSHEY_SIMPLEX, 3, (255,255,255),1)
+            cv2.putText(overlay_image, str(cossim), (50,50),cv2.FONT_HERSHEY_SIMPLEX, 2, (255,255,255),1)
+            cv2.putText(overlay_image, str(counting), (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 1)
             cv2.imshow('posenet', overlay_image)
 
             frame_count += 1

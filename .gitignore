@@ -1,3 +1,5 @@
+openpose/models/*
+
 images/*
 output/*
 .idea/*

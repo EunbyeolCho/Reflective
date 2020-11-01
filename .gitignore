@@ -1,4 +1,4 @@
-openpose/models/*
+openpose/models/pose*
 
 images/*
 output/*

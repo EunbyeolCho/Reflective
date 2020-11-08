@@ -8,7 +8,7 @@ from dtaidistance import dtw
 from posenet import *
 from sklearn import preprocessing
 from sklearn.metrics.pairwise import cosine_similarity
-
+from playsound import playsound
 from posenet.utils import read_cap
 
 parser = argparse.ArgumentParser()
@@ -19,6 +19,44 @@ parser.add_argument('--cam_height', type=int, default=480)
 parser.add_argument('--scale_factor', type=float, default=0.7125)
 parser.add_argument('--file', type=str, default=None, help="Optionally use a video file instead of a live camera")
 args = parser.parse_args()
+
+## 되는데 왜되는지 모르겠어서 빡친다
+def counting_rightarm(keypoint_coords, old_raiseup):
+    Count = False
+    raiseup = old_raiseup
+    if keypoint_coords[0, :, :][10][0] < keypoint_coords[0, :, :][12][0] + 20:
+        ready = "ing"
+        shoulder_min = keypoint_coords[0, :, :][6][0] - 15
+        shoulder_max = keypoint_coords[0, :, :][6][0] + 15
+
+        if shoulder_min < keypoint_coords[0, :, :][10][0] < shoulder_max:
+            raiseup = True
+    hip_min = keypoint_coords[0, :, :][12][0] - 15
+    hip_max = keypoint_coords[0, :, :][12][0] + 15
+    if old_raiseup == True and hip_min < keypoint_coords[0, :, :][10][0] < hip_max:
+        Count = True
+        raiseup = False
+    return Count, raiseup
+
+## 일단은 팔을 올렸다가 다시 내렸을 때 음성 출력하도록 코딩
+def checking_rightarm(keypoint_coords, old_raiseup, old_rightarm):
+    Check = False
+    raiseup = old_raiseup
+    max_rightarm = min(old_rightarm, keypoint_coords[0, :, :][10][0])
+    hip = keypoint_coords[0, :, :][12][0]
+    shoulder_min = keypoint_coords[0, :, :][6][0] + 30
+    shoulder_max = keypoint_coords[0, :, :][6][0] + 15
+    if keypoint_coords[0, :, :][10][0] < hip + 20:
+        if shoulder_max < max_rightarm < shoulder_min:
+            raiseup = True
+    hip_min = hip - 15
+    hip_max = hip + 15
+    if raiseup == True and hip_min < keypoint_coords[0, :, :][10][0] < hip_max:
+        if shoulder_max< max_rightarm < shoulder_min:
+            Check = True
+            raiseup = False
+            max_rightarm = 1000
+    return Check, raiseup, max_rightarm
 
 def imgkey():
     pos_temp_data = []
@@ -134,11 +172,11 @@ def main():
     old_raiseup = False
     okay = False
     raiseup = False
-    print(os.path.isfile('D:\posenet-python-master\images\KakaoTalk_20201101_151405907.mp4'))
+    old_minwrist = 720
     with tf.Session() as sess:
         model_cfg, model_outputs = posenet.load_model(args.model, sess)
         output_stride = model_cfg['output_stride']
-
+        checkraiseup, rightarm = 0, 720
         if args.file is not None:
             cap = cv2.VideoCapture(r"D:\posenet-python-master\images\KakaoTalk_20201101_151405907.mp4")
         else:
@@ -148,13 +186,11 @@ def main():
 
         start = time.time()
         frame_count = 0
-        global framenum
         framenum =0
         while True:
             framenum +=1
             pos_temp_data = []
             sum = 0
-
 
             input_image, display_image, output_scale = read_cap(
                 cap, scale_factor=args.scale_factor, output_stride=output_stride)
@@ -202,26 +238,47 @@ def main():
             ymin_img = coord_img[:, 1].min()
             # print(img_key_coord[0,:,:])
             # print(keypoint_coords[0,:,:][4][1], keypoint_coords[0,:,:][2][1])
-            print(keypoint_coords[0,:,:])
+            # print(keypoint_coords[0,:,:])
             norm_img, norm_our = normalize_sklearn(img_key_coord[0,:,:], keypoint_coords[0,:,:])
 
-            if keypoint_coords[0,:,:][10][0] > keypoint_coords[0,:,:][12][0] + 20:
-                ready = "True"
-            else:
-                ready = "ing"
-                shoulder_min = keypoint_coords[0, :, :][6][0] - 15
-                shoulder_max = keypoint_coords[0, :, :][6][0] + 15
-
-                if shoulder_min < keypoint_coords[0,:,:][10][0] < shoulder_max:
-                    raiseup = True
-            hip_min = keypoint_coords[0, :, :][12][0] - 15
-            hip_max = keypoint_coords[0, :, :][12][0] + 15
-            if raiseup == True and hip_min<keypoint_coords[0, :, :][10][0]<hip_max:
-                counting +=1
-                raiseup = False
-
-            old_raiseup = raiseup
+            # if keypoint_coords[0,:,:][10][0] > keypoint_coords[0,:,:][12][0] + 20:
+            #     ready = "True"
+            # else:
+            #     ready = "ing"
+            #     shoulder_min = keypoint_coords[0, :, :][6][0] - 15
+            #     shoulder_max = keypoint_coords[0, :, :][6][0] + 15
+            #
+            #     if shoulder_min < keypoint_coords[0,:,:][10][0] < shoulder_max:
+            #         raiseup = True
+            # hip_min = keypoint_coords[0, :, :][12][0] - 15
+            # hip_max = keypoint_coords[0, :, :][12][0] + 15
+            # if raiseup == True and hip_min<keypoint_coords[0, :, :][10][0]<hip_max:
+            #     counting +=1
+            #     raiseup = False
+            #
+            # old_raiseup = raiseup
             # cossim = keypoint_compare(img_key_coord[0,:,:], keypoint_coords[0,:,:], xmin, ymin,xmin_img, ymin_img)
+            # rightarmcheck = check_rightarm(keypoint_coords, raiseup)
+            Count, raiseup = counting_rightarm(keypoint_coords, raiseup)
+
+            rightwrist = keypoint_coords[0, :, :][10][0]
+            minwrist = min(rightwrist, old_minwrist)
+            shoulder_min = keypoint_coords[0, :, :][6][0] + 30
+            shoulder_max = keypoint_coords[0, :, :][6][0] + 15
+            hip_min =  keypoint_coords[0, :, :][12][0] - 15
+            hip_max =  keypoint_coords[0, :, :][12][0] + 15
+            if Count:
+                counting +=1
+                minwrist = 720
+            if shoulder_max<minwrist < shoulder_min and hip_min< rightwrist < hip_max:
+                playsound("./sound/rightarm.mp3")
+                minwrist = 720
+            old_minwrist = minwrist
+
+            # Check, checkraiseup, rightarm = checking_rightarm(keypoint_coords, checkraiseup, rightarm)
+            # if Check:
+            #      playsound("./sound/rightarm.mp3")
+
             cossim = keypoint_compare_sklearn(norm_img, norm_our)
             dist = eudist(cossim)
 

@@ -4,7 +4,6 @@ import time
 import os
 import argparse
 import math
-from dtaidistance import dtw
 from posenet import *
 from sklearn import preprocessing
 from sklearn.metrics.pairwise import cosine_similarity
@@ -104,15 +103,6 @@ def imgkey():
         cv2.imshow("image key!",draw_image)
     return pos_temp_data, keypoint_coords
 
-def compare(self, ip, model, i, j):
-    ip = self.normalize(ip)
-    scores = []
-    for k in range(0, 17):
-        scores.append(self.dtwdis(ip[:, k], model[:, k], i, j))
-    return np.mean(scores), scores
-
-def check_sim(correct_key, our_key):
-    return dtw.distance(correct_key, our_key)
 
 def cosine_similarity_our(a, b):
     #return np.inner(a, b) / (np.linalg.norm(a) * (np.linalg.norm(b)))
